@@ -1,0 +1,490 @@
+# Sample GraphQL queries for the Strategy (MONSTR) Subgraph
+
+# ============================================================================
+# LOTTERY QUERIES
+# ============================================================================
+
+# Get last 7 lottery prizes with full details
+query GetRecentLotteryPrizes {
+  lotteryPrizes(first: 7, orderBy: day, orderDirection: desc) {
+    id
+    day
+    winner
+    amount
+    claimed
+    claimTimestamp
+    claimTxHash
+    expired
+    expiryTimestamp
+    expiryTxHash
+    beneficiary
+    timestamp
+    blockNumber
+    txHash
+  }
+}
+
+# Get unclaimed lottery prizes for a specific user
+query GetUserUnclaimedLotteryPrizes($userAddress: Bytes!) {
+  lotteryPrizes(
+    where: {
+      winner: $userAddress,
+      claimed: false,
+      expired: false
+    },
+    orderBy: day,
+    orderDirection: desc
+  ) {
+    day
+    amount
+    timestamp
+  }
+}
+
+# ============================================================================
+# AUCTION QUERIES
+# ============================================================================
+
+# Get last 7 auction results with full details
+query GetRecentAuctionResults {
+  auctionPrizes(first: 7, orderBy: day, orderDirection: desc) {
+    id
+    day
+    winner
+    stratAmount
+    monPaid
+    claimed
+    claimTimestamp
+    claimTxHash
+    expired
+    expiryTimestamp
+    expiryTxHash
+    beneficiary
+    timestamp
+    blockNumber
+    txHash
+    bidCount
+  }
+}
+
+# Get unclaimed auction prizes for a specific user
+query GetUserUnclaimedAuctionPrizes($userAddress: Bytes!) {
+  auctionPrizes(
+    where: {
+      winner: $userAddress,
+      claimed: false,
+      expired: false
+    },
+    orderBy: day,
+    orderDirection: desc
+  ) {
+    day
+    stratAmount
+    monPaid
+    timestamp
+  }
+}
+
+# Get bids for a specific auction
+query GetAuctionBids($auctionId: String!) {
+  bids(
+    where: { auction: $auctionId },
+    orderBy: timestamp,
+    orderDirection: asc
+  ) {
+    id
+    bidder
+    amount
+    timestamp
+    txHash
+  }
+}
+
+# ============================================================================
+# TRANSACTION QUERIES (for Activity Feed)
+# ============================================================================
+
+# Get last 10 transactions for activity feed
+query GetRecentTransactions {
+  transactions(
+    first: 10,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    type
+    user
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    blockNumber
+    txHash
+  }
+}
+
+# Get transactions with pagination
+query GetTransactionsPage($skip: Int!, $first: Int!) {
+  transactions(
+    first: $first,
+    skip: $skip,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    type
+    user
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# Get only mint transactions
+query GetMintTransactions($first: Int!) {
+  transactions(
+    where: { type: MINT },
+    first: $first,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    user
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# Get only redeem transactions
+query GetRedeemTransactions($first: Int!) {
+  transactions(
+    where: { type: REDEEM },
+    first: $first,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    user
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# ============================================================================
+# USER QUERIES
+# ============================================================================
+
+# Get complete user profile with all wins and stats
+query GetUserProfile($userAddress: ID!) {
+  user(id: $userAddress) {
+    id
+    address
+    # Lottery stats
+    lotteryWinCount
+    totalLotteryWinnings
+    lotteryWins(orderBy: day, orderDirection: desc) {
+      day
+      amount
+      claimed
+      expired
+      timestamp
+    }
+    # Auction stats
+    auctionWinCount
+    totalAuctionWinnings
+    totalAuctionSpent
+    auctionWins(orderBy: day, orderDirection: desc) {
+      day
+      stratAmount
+      monPaid
+      claimed
+      expired
+      timestamp
+    }
+    # Transaction stats
+    transactionCount
+    totalMinted
+    totalRedeemed
+    transactions(first: 20, orderBy: timestamp, orderDirection: desc) {
+      id
+      type
+      monAmount
+      stratAmount
+      fee
+      timestamp
+      txHash
+    }
+  }
+}
+
+# Get user's claimable prizes (for "Claim" button)
+query GetUserClaimablePrizes($userAddress: Bytes!) {
+  lotteryPrizes(
+    where: {
+      winner: $userAddress,
+      claimed: false,
+      expired: false
+    }
+  ) {
+    id
+    day
+    amount
+    timestamp
+  }
+  auctionPrizes(
+    where: {
+      winner: $userAddress,
+      claimed: false,
+      expired: false
+    }
+  ) {
+    id
+    day
+    stratAmount
+    timestamp
+  }
+}
+
+# Get user's transaction history
+query GetUserTransactions($userAddress: Bytes!, $first: Int!) {
+  transactions(
+    where: { user: $userAddress },
+    first: $first,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    type
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# ============================================================================
+# PROTOCOL STATISTICS
+# ============================================================================
+
+# Get global protocol stats for dashboard
+query GetProtocolStats {
+  protocolStats(id: "protocol-stats") {
+    # Lottery stats
+    totalLotteryPrizes
+    totalLotteryClaimed
+    totalLotteryExpired
+    lotteryCount
+    # Auction stats
+    totalAuctionPrizes
+    totalAuctionClaimed
+    totalAuctionExpired
+    auctionCount
+    # Transaction stats
+    totalMinted
+    totalRedeemed
+    totalFees
+    totalTransactions
+  }
+}
+
+# ============================================================================
+# COMBINED QUERIES
+# ============================================================================
+
+# Get all data for landing page
+query GetLandingPageData {
+  # Recent prizes
+  lotteryPrizes(first: 7, orderBy: day, orderDirection: desc) {
+    day
+    winner
+    amount
+    claimed
+    expired
+    timestamp
+  }
+  auctionPrizes(first: 7, orderBy: day, orderDirection: desc) {
+    day
+    winner
+    stratAmount
+    monPaid
+    claimed
+    expired
+    timestamp
+  }
+  # Recent activity
+  transactions(first: 10, orderBy: timestamp, orderDirection: desc) {
+    id
+    type
+    user
+    monAmount
+    stratAmount
+    timestamp
+    txHash
+  }
+  # Protocol stats
+  protocolStats(id: "protocol-stats") {
+    totalLotteryPrizes
+    totalAuctionPrizes
+    lotteryCount
+    auctionCount
+    totalMinted
+    totalRedeemed
+  }
+}
+
+# Get all data for user dashboard
+query GetUserDashboard($userAddress: ID!, $userAddressBytes: Bytes!) {
+  # User profile
+  user(id: $userAddress) {
+    address
+    lotteryWinCount
+    auctionWinCount
+    totalLotteryWinnings
+    totalAuctionWinnings
+    totalAuctionSpent
+    totalMinted
+    totalRedeemed
+    transactionCount
+  }
+  # Unclaimed prizes
+  unclaimedLottery: lotteryPrizes(
+    where: {
+      winner: $userAddressBytes,
+      claimed: false,
+      expired: false
+    }
+  ) {
+    day
+    amount
+    timestamp
+  }
+  unclaimedAuction: auctionPrizes(
+    where: {
+      winner: $userAddressBytes,
+      claimed: false,
+      expired: false
+    }
+  ) {
+    day
+    stratAmount
+    monPaid
+    timestamp
+  }
+  # Recent transactions
+  recentTransactions: transactions(
+    where: { user: $userAddressBytes },
+    first: 10,
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    type
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# ============================================================================
+# TIME-BASED QUERIES
+# ============================================================================
+
+# Get prizes for a specific day
+query GetPrizesForDay($day: BigInt!) {
+  lotteryPrizes(where: { day: $day }) {
+    winner
+    amount
+    claimed
+    expired
+    timestamp
+  }
+  auctionPrizes(where: { day: $day }) {
+    winner
+    stratAmount
+    monPaid
+    claimed
+    expired
+    timestamp
+    bidCount
+  }
+}
+
+# Get transactions in a time range
+query GetTransactionsInTimeRange($startTime: BigInt!, $endTime: BigInt!) {
+  transactions(
+    where: {
+      timestamp_gte: $startTime,
+      timestamp_lte: $endTime
+    },
+    orderBy: timestamp,
+    orderDirection: desc
+  ) {
+    id
+    type
+    user
+    monAmount
+    stratAmount
+    fee
+    timestamp
+    txHash
+  }
+}
+
+# ============================================================================
+# LEADERBOARD QUERIES
+# ============================================================================
+
+# Get top lottery winners by total winnings
+query GetTopLotteryWinners($first: Int!) {
+  users(
+    first: $first,
+    orderBy: totalLotteryWinnings,
+    orderDirection: desc,
+    where: { lotteryWinCount_gt: 0 }
+  ) {
+    address
+    lotteryWinCount
+    totalLotteryWinnings
+  }
+}
+
+# Get top auction winners by total winnings
+query GetTopAuctionWinners($first: Int!) {
+  users(
+    first: $first,
+    orderBy: totalAuctionWinnings,
+    orderDirection: desc,
+    where: { auctionWinCount_gt: 0 }
+  ) {
+    address
+    auctionWinCount
+    totalAuctionWinnings
+    totalAuctionSpent
+  }
+}
+
+# Get most active users by transaction count
+query GetMostActiveUsers($first: Int!) {
+  users(
+    first: $first,
+    orderBy: transactionCount,
+    orderDirection: desc,
+    where: { transactionCount_gt: 0 }
+  ) {
+    address
+    transactionCount
+    totalMinted
+    totalRedeemed
+  }
+}

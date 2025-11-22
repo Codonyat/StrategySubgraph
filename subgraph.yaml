@@ -1,0 +1,43 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Strategy
+    network: monad # Update this if needed for testnet vs mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # TODO: Replace with actual contract address from .env
+      abi: Strategy
+      startBlock: 0 # TODO: Replace with deployment block number
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - LotteryPrize
+        - AuctionPrize
+        - Transaction
+        - User
+        - ProtocolStats
+        - Bid
+      abis:
+        - name: Strategy
+          file: ./abis/Strategy.json
+      eventHandlers:
+        - event: LotteryWon(indexed address,uint256,uint256)
+          handler: handleLotteryWon
+        - event: AuctionWon(indexed address,uint256,uint256,uint256)
+          handler: handleAuctionWon
+        - event: PrizeClaimed(indexed address,uint256)
+          handler: handlePrizeClaimed
+        - event: BeneficiaryFunded(indexed address,uint256,address)
+          handler: handleBeneficiaryFunded
+        - event: AuctionStarted(uint256,uint256,uint256)
+          handler: handleAuctionStarted
+        - event: BidPlaced(indexed address,uint256,uint256)
+          handler: handleBidPlaced
+        - event: Minted(indexed address,uint256,uint256,uint256)
+          handler: handleMinted
+        - event: Redeemed(indexed address,uint256,uint256,uint256)
+          handler: handleRedeemed
+      file: ./src/mapping.ts

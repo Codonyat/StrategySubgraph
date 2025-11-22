@@ -1,0 +1,98 @@
+type LotteryPrize @entity {
+  id: ID! # day-lottery format: "123-lottery"
+  day: BigInt!
+  winner: Bytes!
+  amount: BigInt!
+  claimed: Boolean!
+  claimTimestamp: BigInt
+  claimTxHash: Bytes
+  expired: Boolean!
+  expiryTimestamp: BigInt
+  expiryTxHash: Bytes
+  beneficiary: Bytes
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  user: User!
+}
+
+type AuctionPrize @entity {
+  id: ID! # day-auction format: "123-auction"
+  day: BigInt!
+  winner: Bytes!
+  stratAmount: BigInt!
+  monPaid: BigInt!
+  claimed: Boolean!
+  claimTimestamp: BigInt
+  claimTxHash: Bytes
+  expired: Boolean!
+  expiryTimestamp: BigInt
+  expiryTxHash: Bytes
+  beneficiary: Bytes
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  bidCount: Int
+  user: User!
+}
+
+type Transaction @entity {
+  id: ID! # txHash-logIndex format
+  type: TransactionType!
+  user: Bytes!
+  monAmount: BigInt!
+  stratAmount: BigInt!
+  fee: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  userEntity: User!
+}
+
+enum TransactionType {
+  MINT
+  REDEEM
+}
+
+type User @entity {
+  id: ID! # user address
+  address: Bytes!
+  lotteryWins: [LotteryPrize!]! @derivedFrom(field: "user")
+  auctionWins: [AuctionPrize!]! @derivedFrom(field: "user")
+  transactions: [Transaction!]! @derivedFrom(field: "userEntity")
+  totalLotteryWinnings: BigInt!
+  totalAuctionWinnings: BigInt!
+  totalAuctionSpent: BigInt!
+  lotteryWinCount: Int!
+  auctionWinCount: Int!
+  totalMinted: BigInt!
+  totalRedeemed: BigInt!
+  transactionCount: Int!
+}
+
+type ProtocolStats @entity {
+  id: ID! # "protocol-stats"
+  totalLotteryPrizes: BigInt!
+  totalAuctionPrizes: BigInt!
+  totalLotteryClaimed: BigInt!
+  totalAuctionClaimed: BigInt!
+  totalLotteryExpired: BigInt!
+  totalAuctionExpired: BigInt!
+  lotteryCount: Int!
+  auctionCount: Int!
+  totalMinted: BigInt!
+  totalRedeemed: BigInt!
+  totalFees: BigInt!
+  totalTransactions: Int!
+}
+
+type Bid @entity {
+  id: ID! # txHash-logIndex format
+  auction: AuctionPrize!
+  bidder: Bytes!
+  amount: BigInt!
+  day: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
