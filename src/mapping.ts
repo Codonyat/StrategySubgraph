@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, store } from "@graphprotocol/graph-ts";
 import {
   LotteryWon,
   AuctionWon,
@@ -8,6 +8,7 @@ import {
   BidPlaced,
   Minted,
   Redeemed,
+  Transfer,
 } from "../generated/Strategy/Strategy";
 import {
   LotteryPrize,
@@ -19,6 +20,10 @@ import {
 } from "../generated/schema";
 
 const PROTOCOL_STATS_ID = "protocol-stats";
+const FEES_POOL_ADDRESS = "0x00000000000fee50000000add2e5500000000000";
+const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
+const MAX_TRANSACTIONS = 10;
+const MAX_PRIZES = 7;
 
 function getOrCreateUser(address: Bytes): User {
   let user = User.load(address.toHexString());
@@ -54,12 +59,79 @@ function getOrCreateProtocolStats(): ProtocolStats {
     stats.totalRedeemed = BigInt.fromI32(0);
     stats.totalFees = BigInt.fromI32(0);
     stats.totalTransactions = 0;
+    stats.transactionCounter = 0;
     stats.save();
   }
   return stats;
 }
 
+function rotateTransactions(): void {
+  // Query all transactions ordered by timestamp
+  let transactions: Transaction[] = [];
+  let i = 0;
+  while (true) {
+    let tx = Transaction.load(i.toString());
+    if (tx == null) break;
+    transactions.push(tx);
+    i++;
+  }
+
+  // If we have MAX_TRANSACTIONS or more, delete oldest
+  if (transactions.length >= MAX_TRANSACTIONS) {
+    // Sort by timestamp to find oldest
+    transactions.sort((a, b) => {
+      if (a.timestamp.lt(b.timestamp)) return -1;
+      if (a.timestamp.gt(b.timestamp)) return 1;
+      return 0;
+    });
+
+    // Delete oldest transaction(s) to make room
+    for (let j = 0; j < transactions.length - MAX_TRANSACTIONS + 1; j++) {
+      store.remove("Transaction", transactions[j].id);
+    }
+  }
+}
+
+function rotateLotteryPrizes(currentDay: BigInt): void {
+  // Delete lottery prizes older than MAX_PRIZES days
+  // We keep the latest 7 days worth of prizes
+  let oldestDayToKeep = currentDay.minus(BigInt.fromI32(MAX_PRIZES - 1));
+
+  // Try to delete old prizes (going back 100 days to be safe)
+  for (let i = 0; i < 100; i++) {
+    let dayToCheck = oldestDayToKeep.minus(BigInt.fromI32(i + 1));
+    if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+    let prizeId = dayToCheck.toString() + "-lottery";
+    let prize = LotteryPrize.load(prizeId);
+    if (prize != null) {
+      store.remove("LotteryPrize", prizeId);
+    }
+  }
+}
+
+function rotateAuctionPrizes(currentDay: BigInt): void {
+  // Delete auction prizes older than MAX_PRIZES days
+  // We keep the latest 7 days worth of prizes
+  let oldestDayToKeep = currentDay.minus(BigInt.fromI32(MAX_PRIZES - 1));
+
+  // Try to delete old prizes (going back 100 days to be safe)
+  for (let i = 0; i < 100; i++) {
+    let dayToCheck = oldestDayToKeep.minus(BigInt.fromI32(i + 1));
+    if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+    let prizeId = dayToCheck.toString() + "-auction";
+    let prize = AuctionPrize.load(prizeId);
+    if (prize != null) {
+      store.remove("AuctionPrize", prizeId);
+    }
+  }
+}
+
 export function handleLotteryWon(event: LotteryWon): void {
+  // Rotate lottery prizes before adding new one
+  rotateLotteryPrizes(event.params.day);
+
   let id = event.params.day.toString() + "-lottery";
   let prize = new LotteryPrize(id);
 
@@ -89,6 +161,9 @@ export function handleLotteryWon(event: LotteryWon): void {
 }
 
 export function handleAuctionWon(event: AuctionWon): void {
+  // Rotate auction prizes before adding new one
+  rotateAuctionPrizes(event.params.day);
+
   let id = event.params.day.toString() + "-auction";
   let prize = new AuctionPrize(id);
 
@@ -101,6 +176,7 @@ export function handleAuctionWon(event: AuctionWon): void {
   prize.timestamp = event.block.timestamp;
   prize.blockNumber = event.block.number;
   prize.txHash = event.transaction.hash;
+  prize.bidCount = 0; // Initialize bid count
 
   // Update user
   let user = getOrCreateUser(event.params.winner);
@@ -277,11 +353,7 @@ export function handleBidPlaced(event: BidPlaced): void {
   // Update auction bid count
   let auction = AuctionPrize.load(auctionId);
   if (auction != null) {
-    if (auction.bidCount == null) {
-      auction.bidCount = 1;
-    } else {
-      auction.bidCount = auction.bidCount! + 1;
-    }
+    auction.bidCount = auction.bidCount + 1;
     auction.save();
   }
 
@@ -289,7 +361,12 @@ export function handleBidPlaced(event: BidPlaced): void {
 }
 
 export function handleMinted(event: Minted): void {
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  // Rotate transactions before adding new one
+  rotateTransactions();
+
+  // Get protocol stats to get next transaction ID
+  let stats = getOrCreateProtocolStats();
+  let id = stats.transactionCounter.toString();
   let transaction = new Transaction(id);
 
   transaction.type = "MINT";
@@ -309,17 +386,22 @@ export function handleMinted(event: Minted): void {
   user.save();
 
   // Update protocol stats
-  let stats = getOrCreateProtocolStats();
   stats.totalMinted = stats.totalMinted.plus(event.params.stratAmount);
   stats.totalFees = stats.totalFees.plus(event.params.fee);
   stats.totalTransactions = stats.totalTransactions + 1;
+  stats.transactionCounter = stats.transactionCounter + 1;
   stats.save();
 
   transaction.save();
 }
 
 export function handleRedeemed(event: Redeemed): void {
-  let id = event.transaction.hash.toHex() + "-" + event.logIndex.toString();
+  // Rotate transactions before adding new one
+  rotateTransactions();
+
+  // Get protocol stats to get next transaction ID
+  let stats = getOrCreateProtocolStats();
+  let id = stats.transactionCounter.toString();
   let transaction = new Transaction(id);
 
   transaction.type = "REDEEM";
@@ -339,10 +421,52 @@ export function handleRedeemed(event: Redeemed): void {
   user.save();
 
   // Update protocol stats
-  let stats = getOrCreateProtocolStats();
   stats.totalRedeemed = stats.totalRedeemed.plus(event.params.stratAmount);
   stats.totalFees = stats.totalFees.plus(event.params.fee);
   stats.totalTransactions = stats.totalTransactions + 1;
+  stats.transactionCounter = stats.transactionCounter + 1;
+  stats.save();
+
+  transaction.save();
+}
+
+export function handleTransfer(event: Transfer): void {
+  // Only track transfers TO the fee pool address
+  if (event.params.to.toHexString().toLowerCase() != FEES_POOL_ADDRESS.toLowerCase()) {
+    return;
+  }
+
+  // Skip if this is from address zero (likely part of a mint)
+  if (event.params.from.toHexString().toLowerCase() == ADDRESS_ZERO.toLowerCase()) {
+    return;
+  }
+
+  // Rotate transactions before adding new one
+  rotateTransactions();
+
+  // Get protocol stats to get next transaction ID
+  let stats = getOrCreateProtocolStats();
+  let id = stats.transactionCounter.toString();
+  let transaction = new Transaction(id);
+
+  transaction.type = "TRANSFER";
+  transaction.user = event.params.from;
+  transaction.monAmount = BigInt.fromI32(0); // Transfers don't involve MON
+  transaction.stratAmount = event.params.value;
+  transaction.fee = BigInt.fromI32(0); // No fee for transfers
+  transaction.timestamp = event.block.timestamp;
+  transaction.blockNumber = event.block.number;
+  transaction.txHash = event.transaction.hash;
+
+  // Update user
+  let user = getOrCreateUser(event.params.from);
+  transaction.userEntity = user.id;
+  user.transactionCount = user.transactionCount + 1;
+  user.save();
+
+  // Update protocol stats
+  stats.totalTransactions = stats.totalTransactions + 1;
+  stats.transactionCounter = stats.transactionCounter + 1;
   stats.save();
 
   transaction.save();

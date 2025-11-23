@@ -37,7 +37,7 @@ type AuctionPrize @entity {
 }
 
 type Transaction @entity {
-  id: ID! # txHash-logIndex format
+  id: ID! # Sequential number format
   type: TransactionType!
   user: Bytes!
   monAmount: BigInt!
@@ -52,6 +52,7 @@ type Transaction @entity {
 enum TransactionType {
   MINT
   REDEEM
+  TRANSFER
 }
 
 type User @entity {
@@ -84,6 +85,7 @@ type ProtocolStats @entity {
   totalRedeemed: BigInt!
   totalFees: BigInt!
   totalTransactions: Int!
+  transactionCounter: Int!
 }
 
 type Bid @entity {

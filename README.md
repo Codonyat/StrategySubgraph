@@ -2,6 +2,25 @@
 
 This subgraph indexes events from the Strategy (MONSTR) smart contract on the Monad blockchain, enabling efficient querying of lottery prizes, auction results, transactions, and user activity.
 
+## ⚡ Quick Start
+
+**New: Simple `.env`-based build process!**
+
+```bash
+# 1. Create .env file
+cp .env.example .env
+# Edit .env with your ADDRESS and NETWORK
+
+# 2. Build
+npm install
+npm run build
+
+# 3. Deploy
+npm run deploy  # or npm run deploy:goldsky
+```
+
+See **[QUICK_BUILD.md](./QUICK_BUILD.md)** for details.
+
 ## Overview
 
 The Strategy contract is an ERC20 token with unique mechanics including:

@@ -5,9 +5,13 @@
   "repository": "https://github.com/your-org/strategy-subgraph",
   "license": "MIT",
   "scripts": {
+    "prepare": "node build.js",
+    "config": "node build.js --config-only",
     "codegen": "graph codegen",
-    "build": "graph build",
+    "build": "node build.js",
+    "build:graph": "graph build",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ strategy-subgraph",
+    "deploy:goldsky": "node build.js --deploy",
     "create-local": "graph create --node http://localhost:8020/ strategy-subgraph",
     "remove-local": "graph remove --node http://localhost:8020/ strategy-subgraph",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 strategy-subgraph"
