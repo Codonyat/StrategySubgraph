@@ -66,7 +66,7 @@ ${colors.cyan}Options:${colors.reset}
 
 ${colors.cyan}Environment Variables (from .env):${colors.reset}
   ADDRESS          Contract address (required)
-  NETWORK          Network: monad-testnet or monad (required)
+  NETWORK          Network: monad-testnet, monad, or megaeth-testnet (required)
   START_BLOCK      Start block number (optional, defaults to 0)
   GOLDSKY_KEY      Goldsky API key (required for --deploy)
 
@@ -84,7 +84,7 @@ function loadEnv() {
     error('.env file not found!');
     info('Create a .env file with the following variables:');
     console.log('  ADDRESS=0x...');
-    console.log('  NETWORK=monad-testnet or monad');
+    console.log('  NETWORK=monad-testnet, monad, or megaeth-testnet');
     console.log('  START_BLOCK=0 (optional)');
     console.log('  GOLDSKY_KEY=your_key (required for deployment)');
     info('You can copy .env.example to .env and edit it.');
@@ -123,8 +123,8 @@ function validateEnv(env, requireGoldsky = false) {
   // Check NETWORK
   if (!env.NETWORK) {
     errors.push('NETWORK is required');
-  } else if (!['monad_testnet', 'monad', 'monad-testnet'].includes(env.NETWORK)) {
-    errors.push(`NETWORK must be "monad-testnet", "monad_testnet", or "monad", got "${env.NETWORK}"`);
+  } else if (!['monad_testnet', 'monad', 'monad-testnet', 'megaeth-testnet'].includes(env.NETWORK)) {
+    errors.push(`NETWORK must be "monad-testnet", "monad_testnet", "monad", or "megaeth-testnet", got "${env.NETWORK}"`);
   }
 
   // Check GOLDSKY_KEY if deploying
@@ -234,9 +234,9 @@ function main() {
   success('Environment validated');
 
   // Warn about network compatibility
-  if (env.NETWORK === 'monad_testnet' || env.NETWORK === 'monad' || env.NETWORK === 'monad-testnet') {
+  if (['monad_testnet', 'monad', 'monad-testnet', 'megaeth-testnet'].includes(env.NETWORK)) {
     console.log();
-    warning('Monad networks are not supported by The Graph Studio');
+    warning('This network is not supported by The Graph Studio');
     info('You must deploy to Goldsky or a self-hosted Graph Node');
     info('Use: node build.js --deploy (requires GOLDSKY_KEY in .env)');
     if (env.NETWORK === 'monad_testnet') {

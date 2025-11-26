@@ -917,7 +917,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "stratAmount",
+        "name": "tokenAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -942,13 +942,13 @@
         "internalType": "address"
       },
       {
-        "name": "stratAmount",
+        "name": "tokenAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "monPaid",
+        "name": "nativePaid",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1117,13 +1117,13 @@
         "internalType": "address"
       },
       {
-        "name": "monAmount",
+        "name": "collateralAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "stratAmount",
+        "name": "tokenAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1167,13 +1167,13 @@
         "internalType": "address"
       },
       {
-        "name": "stratAmount",
+        "name": "tokenAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
       },
       {
-        "name": "monAmount",
+        "name": "collateralAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

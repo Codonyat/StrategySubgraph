@@ -20,8 +20,8 @@ type AuctionPrize @entity {
   id: ID! # day-auction format: "123-auction"
   day: BigInt!
   winner: Bytes!
-  stratAmount: BigInt!
-  monPaid: BigInt!
+  tokenAmount: BigInt!
+  nativePaid: BigInt!
   claimed: Boolean!
   claimTimestamp: BigInt
   claimTxHash: Bytes
@@ -40,8 +40,8 @@ type Transaction @entity {
   id: ID! # Sequential number format
   type: TransactionType!
   user: Bytes!
-  monAmount: BigInt!
-  stratAmount: BigInt!
+  collateralAmount: BigInt!
+  tokenAmount: BigInt!
   fee: BigInt!
   timestamp: BigInt!
   blockNumber: BigInt!

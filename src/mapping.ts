@@ -169,8 +169,8 @@ export function handleAuctionWon(event: AuctionWon): void {
 
   prize.day = event.params.day;
   prize.winner = event.params.winner;
-  prize.stratAmount = event.params.stratAmount;
-  prize.monPaid = event.params.monPaid;
+  prize.tokenAmount = event.params.tokenAmount;
+  prize.nativePaid = event.params.nativePaid;
   prize.claimed = false;
   prize.expired = false;
   prize.timestamp = event.block.timestamp;
@@ -182,14 +182,14 @@ export function handleAuctionWon(event: AuctionWon): void {
   let user = getOrCreateUser(event.params.winner);
   prize.user = user.id;
   user.auctionWinCount = user.auctionWinCount + 1;
-  user.totalAuctionWinnings = user.totalAuctionWinnings.plus(event.params.stratAmount);
-  user.totalAuctionSpent = user.totalAuctionSpent.plus(event.params.monPaid);
+  user.totalAuctionWinnings = user.totalAuctionWinnings.plus(event.params.tokenAmount);
+  user.totalAuctionSpent = user.totalAuctionSpent.plus(event.params.nativePaid);
   user.save();
 
   // Update protocol stats
   let stats = getOrCreateProtocolStats();
   stats.auctionCount = stats.auctionCount + 1;
-  stats.totalAuctionPrizes = stats.totalAuctionPrizes.plus(event.params.stratAmount);
+  stats.totalAuctionPrizes = stats.totalAuctionPrizes.plus(event.params.tokenAmount);
   stats.save();
 
   prize.save();
@@ -234,7 +234,7 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
 
       if (auction != null &&
           auction.winner.equals(winner) &&
-          auction.stratAmount.equals(amount) &&
+          auction.tokenAmount.equals(amount) &&
           !auction.claimed &&
           !auction.expired) {
         auction.claimed = true;
@@ -302,7 +302,7 @@ export function handleBeneficiaryFunded(event: BeneficiaryFunded): void {
 
         // Update protocol stats
         let stats = getOrCreateProtocolStats();
-        stats.totalAuctionExpired = stats.totalAuctionExpired.plus(auction.stratAmount);
+        stats.totalAuctionExpired = stats.totalAuctionExpired.plus(auction.tokenAmount);
         stats.save();
 
         break;
@@ -322,8 +322,8 @@ export function handleAuctionStarted(event: AuctionStarted): void {
     auction = new AuctionPrize(id);
     auction.day = event.params.day;
     auction.winner = Bytes.fromHexString("0x0000000000000000000000000000000000000000");
-    auction.stratAmount = event.params.stratAmount;
-    auction.monPaid = BigInt.fromI32(0);
+    auction.tokenAmount = event.params.tokenAmount;
+    auction.nativePaid = BigInt.fromI32(0);
     auction.claimed = false;
     auction.expired = false;
     auction.timestamp = event.block.timestamp;
@@ -371,8 +371,8 @@ export function handleMinted(event: Minted): void {
 
   transaction.type = "MINT";
   transaction.user = event.params.to;
-  transaction.monAmount = event.params.monAmount;
-  transaction.stratAmount = event.params.stratAmount;
+  transaction.collateralAmount = event.params.collateralAmount;
+  transaction.tokenAmount = event.params.tokenAmount;
   transaction.fee = event.params.fee;
   transaction.timestamp = event.block.timestamp;
   transaction.blockNumber = event.block.number;
@@ -381,18 +381,44 @@ export function handleMinted(event: Minted): void {
   // Update user
   let user = getOrCreateUser(event.params.to);
   transaction.userEntity = user.id;
-  user.totalMinted = user.totalMinted.plus(event.params.stratAmount);
+  user.totalMinted = user.totalMinted.plus(event.params.tokenAmount);
   user.transactionCount = user.transactionCount + 1;
-  user.save();
 
   // Update protocol stats
-  stats.totalMinted = stats.totalMinted.plus(event.params.stratAmount);
+  stats.totalMinted = stats.totalMinted.plus(event.params.tokenAmount);
   stats.totalFees = stats.totalFees.plus(event.params.fee);
   stats.totalTransactions = stats.totalTransactions + 1;
   stats.transactionCounter = stats.transactionCounter + 1;
-  stats.save();
 
   transaction.save();
+
+  // Create a separate TRANSFER transaction for the fee if fee > 0
+  if (event.params.fee.gt(BigInt.fromI32(0))) {
+    rotateTransactions();
+
+    let feeId = stats.transactionCounter.toString();
+    let feeTransaction = new Transaction(feeId);
+
+    feeTransaction.type = "TRANSFER";
+    feeTransaction.user = event.params.to;
+    feeTransaction.collateralAmount = BigInt.fromI32(0);
+    feeTransaction.tokenAmount = event.params.fee;
+    feeTransaction.fee = BigInt.fromI32(0);
+    feeTransaction.timestamp = event.block.timestamp;
+    feeTransaction.blockNumber = event.block.number;
+    feeTransaction.txHash = event.transaction.hash;
+    feeTransaction.userEntity = user.id;
+
+    user.transactionCount = user.transactionCount + 1;
+
+    stats.totalTransactions = stats.totalTransactions + 1;
+    stats.transactionCounter = stats.transactionCounter + 1;
+
+    feeTransaction.save();
+  }
+
+  user.save();
+  stats.save();
 }
 
 export function handleRedeemed(event: Redeemed): void {
@@ -406,8 +432,8 @@ export function handleRedeemed(event: Redeemed): void {
 
   transaction.type = "REDEEM";
   transaction.user = event.params.from;
-  transaction.monAmount = event.params.monAmount;
-  transaction.stratAmount = event.params.stratAmount;
+  transaction.collateralAmount = event.params.collateralAmount;
+  transaction.tokenAmount = event.params.tokenAmount;
   transaction.fee = event.params.fee;
   transaction.timestamp = event.block.timestamp;
   transaction.blockNumber = event.block.number;
@@ -416,12 +442,12 @@ export function handleRedeemed(event: Redeemed): void {
   // Update user
   let user = getOrCreateUser(event.params.from);
   transaction.userEntity = user.id;
-  user.totalRedeemed = user.totalRedeemed.plus(event.params.stratAmount);
+  user.totalRedeemed = user.totalRedeemed.plus(event.params.tokenAmount);
   user.transactionCount = user.transactionCount + 1;
   user.save();
 
   // Update protocol stats
-  stats.totalRedeemed = stats.totalRedeemed.plus(event.params.stratAmount);
+  stats.totalRedeemed = stats.totalRedeemed.plus(event.params.tokenAmount);
   stats.totalFees = stats.totalFees.plus(event.params.fee);
   stats.totalTransactions = stats.totalTransactions + 1;
   stats.transactionCounter = stats.transactionCounter + 1;
@@ -436,7 +462,7 @@ export function handleTransfer(event: Transfer): void {
     return;
   }
 
-  // Skip if this is from address zero (likely part of a mint)
+  // Skip transfers from zero address - these are mint fees and are handled in handleMinted
   if (event.params.from.toHexString().toLowerCase() == ADDRESS_ZERO.toLowerCase()) {
     return;
   }
@@ -451,8 +477,8 @@ export function handleTransfer(event: Transfer): void {
 
   transaction.type = "TRANSFER";
   transaction.user = event.params.from;
-  transaction.monAmount = BigInt.fromI32(0); // Transfers don't involve MON
-  transaction.stratAmount = event.params.value;
+  transaction.collateralAmount = BigInt.fromI32(0); // Transfers don't involve collateral
+  transaction.tokenAmount = event.params.value;
   transaction.fee = BigInt.fromI32(0); // No fee for transfers
   transaction.timestamp = event.block.timestamp;
   transaction.blockNumber = event.block.number;
