@@ -383,16 +383,42 @@ export function handleMinted(event: Minted): void {
   transaction.userEntity = user.id;
   user.totalMinted = user.totalMinted.plus(event.params.stratAmount);
   user.transactionCount = user.transactionCount + 1;
-  user.save();
 
   // Update protocol stats
   stats.totalMinted = stats.totalMinted.plus(event.params.stratAmount);
   stats.totalFees = stats.totalFees.plus(event.params.fee);
   stats.totalTransactions = stats.totalTransactions + 1;
   stats.transactionCounter = stats.transactionCounter + 1;
-  stats.save();
 
   transaction.save();
+
+  // Create a separate TRANSFER transaction for the fee if fee > 0
+  if (event.params.fee.gt(BigInt.fromI32(0))) {
+    rotateTransactions();
+
+    let feeId = stats.transactionCounter.toString();
+    let feeTransaction = new Transaction(feeId);
+
+    feeTransaction.type = "TRANSFER";
+    feeTransaction.user = event.params.to;
+    feeTransaction.monAmount = BigInt.fromI32(0);
+    feeTransaction.stratAmount = event.params.fee;
+    feeTransaction.fee = BigInt.fromI32(0);
+    feeTransaction.timestamp = event.block.timestamp;
+    feeTransaction.blockNumber = event.block.number;
+    feeTransaction.txHash = event.transaction.hash;
+    feeTransaction.userEntity = user.id;
+
+    user.transactionCount = user.transactionCount + 1;
+
+    stats.totalTransactions = stats.totalTransactions + 1;
+    stats.transactionCounter = stats.transactionCounter + 1;
+
+    feeTransaction.save();
+  }
+
+  user.save();
+  stats.save();
 }
 
 export function handleRedeemed(event: Redeemed): void {
@@ -436,7 +462,7 @@ export function handleTransfer(event: Transfer): void {
     return;
   }
 
-  // Skip if this is from address zero (likely part of a mint)
+  // Skip transfers from zero address - these are mint fees and are handled in handleMinted
   if (event.params.from.toHexString().toLowerCase() == ADDRESS_ZERO.toLowerCase()) {
     return;
   }

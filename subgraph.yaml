@@ -4,11 +4,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: Strategy
-    network: monad-testnet # Update this if needed for testnet vs mainnet
+    network: monad # Update this if needed for testnet vs mainnet
     source:
-      address: "0x988f240E6D16580f4C7E5cc6C532215231572110" # TODO: Replace with actual contract address from .env
+      address: "0x4edF071a7dEe52fBE663DF7873994725ba91Cdc7" # TODO: Replace with actual contract address from .env
       abi: Strategy
-      startBlock: 49429895 # TODO: Replace with deployment block number
+      startBlock: 37758988 # TODO: Replace with deployment block number
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
