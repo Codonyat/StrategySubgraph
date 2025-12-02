@@ -3,7 +3,9 @@
     "allow": [
       "Bash(node -e:*)",
       "Bash(npm run codegen:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

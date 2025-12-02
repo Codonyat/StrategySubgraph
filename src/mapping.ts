@@ -60,36 +60,16 @@ function getOrCreateProtocolStats(): ProtocolStats {
     stats.totalFees = BigInt.fromI32(0);
     stats.totalTransactions = 0;
     stats.transactionCounter = 0;
+    stats.lastLotteryDay = BigInt.fromI32(0);
+    stats.lastAuctionDay = BigInt.fromI32(0);
     stats.save();
   }
   return stats;
 }
 
-function rotateTransactions(): void {
-  // Query all transactions ordered by timestamp
-  let transactions: Transaction[] = [];
-  let i = 0;
-  while (true) {
-    let tx = Transaction.load(i.toString());
-    if (tx == null) break;
-    transactions.push(tx);
-    i++;
-  }
-
-  // If we have MAX_TRANSACTIONS or more, delete oldest
-  if (transactions.length >= MAX_TRANSACTIONS) {
-    // Sort by timestamp to find oldest
-    transactions.sort((a, b) => {
-      if (a.timestamp.lt(b.timestamp)) return -1;
-      if (a.timestamp.gt(b.timestamp)) return 1;
-      return 0;
-    });
-
-    // Delete oldest transaction(s) to make room
-    for (let j = 0; j < transactions.length - MAX_TRANSACTIONS + 1; j++) {
-      store.remove("Transaction", transactions[j].id);
-    }
-  }
+// Returns the next transaction ID using circular buffer (0 to MAX_TRANSACTIONS-1)
+function getNextTransactionId(stats: ProtocolStats): string {
+  return (stats.transactionCounter % MAX_TRANSACTIONS).toString();
 }
 
 function rotateLotteryPrizes(currentDay: BigInt): void {
@@ -155,6 +135,7 @@ export function handleLotteryWon(event: LotteryWon): void {
   let stats = getOrCreateProtocolStats();
   stats.lotteryCount = stats.lotteryCount + 1;
   stats.totalLotteryPrizes = stats.totalLotteryPrizes.plus(event.params.amount);
+  stats.lastLotteryDay = event.params.day;
   stats.save();
 
   prize.save();
@@ -190,6 +171,7 @@ export function handleAuctionWon(event: AuctionWon): void {
   let stats = getOrCreateProtocolStats();
   stats.auctionCount = stats.auctionCount + 1;
   stats.totalAuctionPrizes = stats.totalAuctionPrizes.plus(event.params.tokenAmount);
+  stats.lastAuctionDay = event.params.day;
   stats.save();
 
   prize.save();
@@ -198,12 +180,16 @@ export function handleAuctionWon(event: AuctionWon): void {
 export function handlePrizeClaimed(event: PrizeClaimed): void {
   let winner = event.params.winner;
   let amount = event.params.amount;
+  let stats = getOrCreateProtocolStats();
 
   // Try to find matching lottery prize first
-  // Search the last 30 lottery prizes (more than 7 to account for possible delays)
+  // Search from lastLotteryDay backwards for MAX_PRIZES days
   let foundLottery = false;
-  for (let i = 0; i < 30; i++) {
-    let lotteryId = i.toString() + "-lottery";
+  for (let i = 0; i < MAX_PRIZES; i++) {
+    let dayToCheck = stats.lastLotteryDay.minus(BigInt.fromI32(i));
+    if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+    let lotteryId = dayToCheck.toString() + "-lottery";
     let lottery = LotteryPrize.load(lotteryId);
 
     if (lottery != null &&
@@ -216,8 +202,6 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
       lottery.claimTxHash = event.transaction.hash;
       lottery.save();
 
-      // Update protocol stats
-      let stats = getOrCreateProtocolStats();
       stats.totalLotteryClaimed = stats.totalLotteryClaimed.plus(amount);
       stats.save();
 
@@ -228,8 +212,11 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
 
   // If not found in lottery prizes, search auction prizes
   if (!foundLottery) {
-    for (let i = 0; i < 30; i++) {
-      let auctionId = i.toString() + "-auction";
+    for (let i = 0; i < MAX_PRIZES; i++) {
+      let dayToCheck = stats.lastAuctionDay.minus(BigInt.fromI32(i));
+      if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+      let auctionId = dayToCheck.toString() + "-auction";
       let auction = AuctionPrize.load(auctionId);
 
       if (auction != null &&
@@ -242,8 +229,6 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
         auction.claimTxHash = event.transaction.hash;
         auction.save();
 
-        // Update protocol stats
-        let stats = getOrCreateProtocolStats();
         stats.totalAuctionClaimed = stats.totalAuctionClaimed.plus(amount);
         stats.save();
 
@@ -256,12 +241,16 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
 export function handleBeneficiaryFunded(event: BeneficiaryFunded): void {
   let previousWinner = event.params.previousWinner;
   let beneficiary = event.params.beneficiary;
-  let amount = event.params.amount;
+  let stats = getOrCreateProtocolStats();
 
   // Try to find matching lottery prize first
+  // Search from lastLotteryDay backwards for MAX_PRIZES days
   let foundLottery = false;
-  for (let i = 0; i < 30; i++) {
-    let lotteryId = i.toString() + "-lottery";
+  for (let i = 0; i < MAX_PRIZES; i++) {
+    let dayToCheck = stats.lastLotteryDay.minus(BigInt.fromI32(i));
+    if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+    let lotteryId = dayToCheck.toString() + "-lottery";
     let lottery = LotteryPrize.load(lotteryId);
 
     if (lottery != null &&
@@ -274,8 +263,6 @@ export function handleBeneficiaryFunded(event: BeneficiaryFunded): void {
       lottery.beneficiary = beneficiary;
       lottery.save();
 
-      // Update protocol stats
-      let stats = getOrCreateProtocolStats();
       stats.totalLotteryExpired = stats.totalLotteryExpired.plus(lottery.amount);
       stats.save();
 
@@ -286,8 +273,11 @@ export function handleBeneficiaryFunded(event: BeneficiaryFunded): void {
 
   // If not found in lottery prizes, search auction prizes
   if (!foundLottery) {
-    for (let i = 0; i < 30; i++) {
-      let auctionId = i.toString() + "-auction";
+    for (let i = 0; i < MAX_PRIZES; i++) {
+      let dayToCheck = stats.lastAuctionDay.minus(BigInt.fromI32(i));
+      if (dayToCheck.lt(BigInt.fromI32(0))) break;
+
+      let auctionId = dayToCheck.toString() + "-auction";
       let auction = AuctionPrize.load(auctionId);
 
       if (auction != null &&
@@ -300,8 +290,6 @@ export function handleBeneficiaryFunded(event: BeneficiaryFunded): void {
         auction.beneficiary = beneficiary;
         auction.save();
 
-        // Update protocol stats
-        let stats = getOrCreateProtocolStats();
         stats.totalAuctionExpired = stats.totalAuctionExpired.plus(auction.tokenAmount);
         stats.save();
 
@@ -361,12 +349,9 @@ export function handleBidPlaced(event: BidPlaced): void {
 }
 
 export function handleMinted(event: Minted): void {
-  // Rotate transactions before adding new one
-  rotateTransactions();
-
-  // Get protocol stats to get next transaction ID
+  // Get protocol stats to get next transaction ID (circular buffer)
   let stats = getOrCreateProtocolStats();
-  let id = stats.transactionCounter.toString();
+  let id = getNextTransactionId(stats);
   let transaction = new Transaction(id);
 
   transaction.type = "MINT";
@@ -394,9 +379,7 @@ export function handleMinted(event: Minted): void {
 
   // Create a separate TRANSFER transaction for the fee if fee > 0
   if (event.params.fee.gt(BigInt.fromI32(0))) {
-    rotateTransactions();
-
-    let feeId = stats.transactionCounter.toString();
+    let feeId = getNextTransactionId(stats);
     let feeTransaction = new Transaction(feeId);
 
     feeTransaction.type = "TRANSFER";
@@ -422,12 +405,9 @@ export function handleMinted(event: Minted): void {
 }
 
 export function handleRedeemed(event: Redeemed): void {
-  // Rotate transactions before adding new one
-  rotateTransactions();
-
-  // Get protocol stats to get next transaction ID
+  // Get protocol stats to get next transaction ID (circular buffer)
   let stats = getOrCreateProtocolStats();
-  let id = stats.transactionCounter.toString();
+  let id = getNextTransactionId(stats);
   let transaction = new Transaction(id);
 
   transaction.type = "REDEEM";
@@ -467,12 +447,9 @@ export function handleTransfer(event: Transfer): void {
     return;
   }
 
-  // Rotate transactions before adding new one
-  rotateTransactions();
-
-  // Get protocol stats to get next transaction ID
+  // Get protocol stats to get next transaction ID (circular buffer)
   let stats = getOrCreateProtocolStats();
-  let id = stats.transactionCounter.toString();
+  let id = getNextTransactionId(stats);
   let transaction = new Transaction(id);
 
   transaction.type = "TRANSFER";

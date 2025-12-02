@@ -1,4 +1,4 @@
-type LotteryPrize @entity {
+type LotteryPrize @entity(immutable: false) {
   id: ID! # day-lottery format: "123-lottery"
   day: BigInt!
   winner: Bytes!
@@ -16,7 +16,7 @@ type LotteryPrize @entity {
   user: User!
 }
 
-type AuctionPrize @entity {
+type AuctionPrize @entity(immutable: false) {
   id: ID! # day-auction format: "123-auction"
   day: BigInt!
   winner: Bytes!
@@ -36,7 +36,7 @@ type AuctionPrize @entity {
   user: User!
 }
 
-type Transaction @entity {
+type Transaction @entity(immutable: false) {
   id: ID! # Sequential number format
   type: TransactionType!
   user: Bytes!
@@ -55,7 +55,7 @@ enum TransactionType {
   TRANSFER
 }
 
-type User @entity {
+type User @entity(immutable: false) {
   id: ID! # user address
   address: Bytes!
   lotteryWins: [LotteryPrize!]! @derivedFrom(field: "user")
@@ -71,7 +71,7 @@ type User @entity {
   transactionCount: Int!
 }
 
-type ProtocolStats @entity {
+type ProtocolStats @entity(immutable: false) {
   id: ID! # "protocol-stats"
   totalLotteryPrizes: BigInt!
   totalAuctionPrizes: BigInt!
@@ -86,9 +86,11 @@ type ProtocolStats @entity {
   totalFees: BigInt!
   totalTransactions: Int!
   transactionCounter: Int!
+  lastLotteryDay: BigInt!
+  lastAuctionDay: BigInt!
 }
 
-type Bid @entity {
+type Bid @entity(immutable: true) {
   id: ID! # txHash-logIndex format
   auction: AuctionPrize!
   bidder: Bytes!
