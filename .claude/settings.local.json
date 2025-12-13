@@ -5,7 +5,8 @@
       "Bash(npm run codegen:*)",
       "Bash(npm run build:*)",
       "Bash(dir:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(forge build:*)"
     ],
     "deny": [],
     "ask": []
